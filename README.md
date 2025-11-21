@@ -182,14 +182,6 @@ All endpoints require Clerk authentication in production.
   "preferredDate": "2025-12-25"
 }
 ```
-
-## 🎨 Supported Cities
-
-The app supports waste pickup scheduling in these African cities:
-- Nairobi, Kisumu, Mombasa (Kenya)
-- Harare (Zimbabwe)
-- Johannesburg, Pretoria, Emalahleni, Secunda, Rustenburg (South Africa)
-
 ## 🌓 Theme Support
 
 - **Light Mode** - Clean, bright interface for daytime usage
