@@ -6,6 +6,7 @@ import express, {
   Response,
   NextFunction,
 } from "express";
+import cors from "cors";
 
 import { registerRoutes } from "./routes";
 
@@ -27,6 +28,41 @@ declare module 'http' {
     rawBody: unknown
   }
 }
+
+// CORS Configuration
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const defaultOrigins = ["http://localhost:5000", "http://127.0.0.1:5000", "http://localhost:5173", "http://127.0.0.1:5173"];
+
+const corsOrigins = allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins;
+
+if (process.env.NODE_ENV !== "production") {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] CORS origins: ${corsOrigins.join(", ")}`);
+}
+
+const corsOptions = {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    if (!origin || corsOrigins.includes(origin) || corsOrigins.includes("*")) {
+      callback(null, true);
+    } else {
+      if (process.env.NODE_ENV !== "production") {
+        console.error(`[CORS] Blocked origin: ${origin}`);
+      }
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  maxAge: 600,
+};
+
+app.use(cors(corsOptions));
+
 app.use(express.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;
@@ -94,3 +130,4 @@ export default async function runApp(
     log(`serving on port ${port}`);
   });
 }
+
