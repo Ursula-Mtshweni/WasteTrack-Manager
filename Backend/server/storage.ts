@@ -1,5 +1,27 @@
+import mongoose, { Schema, Document } from "mongoose";
 import { type User, type InsertUser, type WastePickup, type InsertWastePickup } from "@shared/schema";
-import { randomUUID } from "crypto";
+
+// Mongoose Document interfaces
+interface UserDoc extends Document, Omit<User, '_id'> {}
+interface WastePickupDoc extends Document, Omit<WastePickup, '_id'> {}
+
+// Mongoose Schemas
+const userSchema = new Schema<UserDoc>({
+  username: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+});
+
+const wastePickupSchema = new Schema<WastePickupDoc>({
+  fullName: { type: String, required: true },
+  location: { type: String, required: true },
+  wasteType: { type: String, required: true },
+  preferredDate: { type: String, default: null },
+  createdAt: { type: Date, default: Date.now },
+});
+
+// Mongoose Models
+const UserModel = mongoose.model<UserDoc>("User", userSchema);
+const WastePickupModel = mongoose.model<WastePickupDoc>("WastePickup", wastePickupSchema);
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -13,64 +35,136 @@ export interface IStorage {
   deleteWastePickup(id: string): Promise<boolean>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private wastePickups: Map<string, WastePickup>;
-
-  constructor() {
-    this.users = new Map();
-    this.wastePickups = new Map();
-  }
-
+export class MongoStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    try {
+      const user = await UserModel.findById(id);
+      if (!user) return undefined;
+      return {
+        _id: user._id.toString(),
+        username: user.username,
+        password: user.password,
+      };
+    } catch (error) {
+      return undefined;
+    }
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    try {
+      const user = await UserModel.findOne({ username });
+      if (!user) return undefined;
+      return {
+        _id: user._id.toString(),
+        username: user.username,
+        password: user.password,
+      };
+    } catch (error) {
+      return undefined;
+    }
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+    const user = new UserModel(insertUser);
+    await user.save();
+    return {
+      _id: user._id.toString(),
+      username: user.username,
+      password: user.password,
+    };
   }
 
   async createWastePickup(insertPickup: InsertWastePickup): Promise<WastePickup> {
-    const id = randomUUID();
-    const pickup: WastePickup = { 
+    const pickup = new WastePickupModel({
       ...insertPickup,
-      preferredDate: insertPickup.preferredDate || null,
-      id,
-      createdAt: new Date()
+      createdAt: new Date(),
+    });
+    await pickup.save();
+    return {
+      _id: pickup._id.toString(),
+      fullName: pickup.fullName,
+      location: pickup.location,
+      wasteType: pickup.wasteType,
+      preferredDate: pickup.preferredDate || null,
+      createdAt: pickup.createdAt,
     };
-    this.wastePickups.set(id, pickup);
-    return pickup;
   }
 
   async getWastePickup(id: string): Promise<WastePickup | undefined> {
-    return this.wastePickups.get(id);
+    try {
+      const pickup = await WastePickupModel.findById(id);
+      if (!pickup) return undefined;
+      return {
+        _id: pickup._id.toString(),
+        fullName: pickup.fullName,
+        location: pickup.location,
+        wasteType: pickup.wasteType,
+        preferredDate: pickup.preferredDate || null,
+        createdAt: pickup.createdAt,
+      };
+    } catch (error) {
+      return undefined;
+    }
   }
 
   async getAllWastePickups(): Promise<WastePickup[]> {
-    return Array.from(this.wastePickups.values());
+    try {
+      const pickups = await WastePickupModel.find().sort({ createdAt: -1 });
+      return pickups.map((pickup) => ({
+        _id: pickup._id.toString(),
+        fullName: pickup.fullName,
+        location: pickup.location,
+        wasteType: pickup.wasteType,
+        preferredDate: pickup.preferredDate || null,
+        createdAt: pickup.createdAt,
+      }));
+    } catch (error) {
+      return [];
+    }
   }
 
   async updateWastePickup(id: string, updateData: Partial<InsertWastePickup>): Promise<WastePickup | undefined> {
-    const existing = this.wastePickups.get(id);
-    if (!existing) return undefined;
-    
-    const updated: WastePickup = { ...existing, ...updateData };
-    this.wastePickups.set(id, updated);
-    return updated;
+    try {
+      const pickup = await WastePickupModel.findByIdAndUpdate(
+        id,
+        updateData,
+        { new: true }
+      );
+      if (!pickup) return undefined;
+      return {
+        _id: pickup._id.toString(),
+        fullName: pickup.fullName,
+        location: pickup.location,
+        wasteType: pickup.wasteType,
+        preferredDate: pickup.preferredDate || null,
+        createdAt: pickup.createdAt,
+      };
+    } catch (error) {
+      return undefined;
+    }
   }
 
   async deleteWastePickup(id: string): Promise<boolean> {
-    return this.wastePickups.delete(id);
+    try {
+      const result = await WastePickupModel.findByIdAndDelete(id);
+      return !!result;
+    } catch (error) {
+      return false;
+    }
   }
 }
 
-export const storage = new MemStorage();
+// Export storage instance (will be initialized after MongoDB connection)
+export let storage: IStorage;
+
+export async function initializeStorage(): Promise<void> {
+  const mongoUri = process.env.MONGODB_URI;
+  if (!mongoUri) {
+    throw new Error("MONGODB_URI environment variable is not set");
+  }
+  
+  await mongoose.connect(mongoUri);
+  storage = new MongoStorage();
+  console.log("MongoDB connected and storage initialized");
+}
+
