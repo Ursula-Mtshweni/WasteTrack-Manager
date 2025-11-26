@@ -8,6 +8,7 @@ import { createServer as createViteServer, createLogger } from "vite";
 
 import viteConfig from "../vite.config";
 import runApp from "./app";
+import { initializeStorage } from "./storage";
 
 export async function setupVite(app: Express, server: Server) {
   const viteLogger = createLogger();
@@ -59,5 +60,12 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 (async () => {
-  await runApp(setupVite);
+  try {
+    await initializeStorage();
+    await runApp(setupVite);
+  } catch (error) {
+    console.error("Failed to start application:", error);
+    process.exit(1);
+  }
 })();
+
