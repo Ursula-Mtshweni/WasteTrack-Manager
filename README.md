@@ -225,6 +225,8 @@ Educational content about waste management with three sections:
 ```bash
 npm run build
 ```
+## Output
+dist
 
 This generates:
 - Optimized React bundle in `dist/public/`
@@ -233,7 +235,7 @@ This generates:
 
 ### Build Backend
 ```bash
-npm run build
+npm install && npm run build
 ```
 
 This generates:
